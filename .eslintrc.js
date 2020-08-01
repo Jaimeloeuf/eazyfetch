@@ -15,7 +15,6 @@ module.exports = {
   rules: {
     "prettier/prettier": "error",
     "no-unused-vars": "error",
-    "no-console": "error",
     "no-debugger": "error",
     "comma-dangle": ["error", "only-multiline"],
   },

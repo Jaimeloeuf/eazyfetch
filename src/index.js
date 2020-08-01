@@ -8,46 +8,94 @@ if (!window.fetch) throw new Error("FETCH API NOT AVAILABLE ON BROWSER");
 
 import deepmerge from "deepmerge";
 
-import getParsedResponse from "./getParsedResponse";
+import defaultErrorHandler from "./plugins/defaultErrorHandler";
 
 /**
  * Suggestion: import package as "api" to avoid name collision with window.fetch
  */
 export default class fetch {
   /**
-   * @param {string} apiUrl Base API URL
-   * @param {function} [errorHandler] Error handling function for when the fetch failed
+   * @param {object} configurations configurations object to configure the library
    */
-  constructor(firebaseAuth, apiUrl, errorHandler) {
-    if (!firebaseAuth)
-      throw new Error("Firebase Auth is required for this to work");
+  constructor(configurations = {}) {
+    // Destructure out all possible configuration values
+    // All array values have default empty arrays to prevent accessing properties of undefined errors
+    // @todo Remove to use null coalescing if using typescript or babel
+    const {
+      apiUrl,
+      apiUrls = [],
+      plugins = [],
+      errorHandler,
+      errorHandlers = [],
+    } = configurations;
 
-    // Internal firebase auth instance that must be set to share the same auth instance between this library and your app
-    this._firebaseAuth = firebaseAuth;
+    /*
+      Sequentially,
+        set apiURLs
+        then plugins
+        then errorHandlers
+    */
+
+    // Combine all urls into a single array
+    this._apiUrls = apiUrl ? [apiUrl, ...apiUrls] : apiUrls;
 
     // Set the module's internal base api URL
-    this._apiUrl = apiUrl;
+    // Defaults to empty string to prevent concatenation with undefined as undefined will get converted to a string
+    // Order of precendence for the default base URL is apiUrl first then first apiUrl in the array of apiUrls
+    // @todo Change this multi assignment
+    this._apiUrl = this._default = this._apiUrls[0];
 
-    // Only set the error handler if defined, else keep the default handler
-    if (errorHandler) this._errorHandler = errorHandler;
-    else this._errorHandler = defaultErrorHandler;
 
-    // Empty factory function calls to use default empty object
-    this.get = this._get();
-    this.post = this._post();
-    this.patch = this._patch();
-    this.put = this._put();
-    this.delete = this._delete();
+    // All base API URLs if any, gets attached directly onto the object with "$" prepended to the key
+    // SOLVES THIS Might be dangerous as users can technically inject anything to pollute the "this" namespace
+    if (this._apiUrls.length)
+      deepmerge(
+        this,
+        apiUrls.reduce(function (acc, cur) {
+          acc[`$${cur.name}`] = cur.url;
+          return acc;
+        }, {})
+      );
+
+    // Defaults to array even though the destructure already contains the default value just to be extra safe
+    this._plugins = plugins || [];
+
+    // These are either
+    this._errorHandlers = errorHandler
+      ? [errorHandler, ...errorHandlers]
+      : errorHandlers
+      ? errorHandlers
+      : defaultErrorHandler;
   }
 
   /**
-   * USE WITH CAUTION. If you set a new base URL, this will affect every other call out there.
-   * --- Experimental --- Might be removed in future versions. DO NOT depend on this
-   * @param {string} apiUrl Base API URL
+   * Should only be called by _fetch
    */
-  __setBaseUrl(apiUrl) {
-    // Set the module's internal base api URL
-    this._apiUrl = apiUrl;
+  async _runPlugins(url, init) {
+    const request = {
+      url,
+      init,
+      headers: init.headers,
+      body: init.body,
+    };
+
+    const response = {
+      body: response.body,
+      status: response.code, // ???
+    };
+
+    const error = response.error;
+
+    // Call the plugins
+    for (const plugin in this._plugins) {
+      // @todo How to set the return value of this as request or response?
+      await plugin(request, response, { merge: deepmerge, error });
+    }
+  }
+
+  async _runErrorHandlers(error) {
+    // This might be slow if one handler takes a very long time
+    for (const handler in this._errorHandlers) await handler(error);
   }
 
   /**
@@ -58,6 +106,9 @@ export default class fetch {
    */
   async _fetch(url = "", init) {
     try {
+      // Set the return value to be init
+      await this._runPlugins(url, init);
+
       // Call window fetch with prepended API URL and default request object
       const response = await window.fetch(this._apiUrl + url, init);
 
@@ -70,7 +121,7 @@ export default class fetch {
         return { body: parsedResponse.response, statusCode: response.status };
       else throw new Error("Invalid body type. Neither JSON nor String");
     } catch (error) {
-      return this._errorHandler(error);
+      return this._runErrorHandlers(error);
     }
   }
 
