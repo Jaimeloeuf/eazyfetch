@@ -31,6 +31,9 @@ Notes / FAQ:
 ## Roadmap / planned features
 - Allow users to define base API URL specific plugins instead of making plugin developers do route checking manually themselves.
 
+## Technical Details
+- Allow you to call arbitrary HTTP methods using the Proxy meta programming method
+- Chaining with modify is implmeneted by returning a new but similiar proxy
 
 ## License, Author, Contributing and credits
 This project takes inspirations from these projects:

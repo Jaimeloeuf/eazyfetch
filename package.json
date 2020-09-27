@@ -2,6 +2,7 @@
   "name": "eazyfetch",
   "version": "0.1.0",
   "description": "Opinionated library to simplify browsers' 'fetch' API with a built in plugin architecture",
+  "type": "module",
   "module": "./dist/index.js",
   "files": [
     "/dist"
@@ -9,7 +10,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "npx eslint --fix && npx prettier --write **/*.js --ignore-path ./.gitignore",
-    "build": "npm run lint && git stash --include-untracked && npx rimraf ./dist && npx webpack --config webpack.config.js && git stash apply",
+    "build": "npm run lint && git stash --include-untracked && npx rimraf ./dist && npx webpack --config webpack.config.cjs && git stash apply",
+    "build:develop": "npx rimraf ./dist && npx webpack --config webpack.config.cjs",
     "publish:npm": "npm run build && npm publish"
   },
   "repository": {
@@ -33,14 +35,14 @@
   },
   "devDependencies": {
     "babel-eslint": "^10.1.0",
-    "eslint": "^7.5.0",
-    "eslint-config-prettier": "^6.11.0",
+    "eslint": "^7.10.0",
+    "eslint-config-prettier": "^6.12.0",
     "eslint-plugin-prettier": "^3.1.4",
-    "husky": "^4.2.5",
-    "lint-staged": "^10.2.11",
-    "prettier": "^2.0.5",
+    "husky": "^4.3.0",
+    "lint-staged": "^10.4.0",
+    "prettier": "^2.1.2",
     "rimraf": "^3.0.2",
-    "webpack": "^4.43.0",
+    "webpack": "^4.44.2",
     "webpack-cli": "^3.3.12"
   },
   "husky": {
