@@ -1,283 +1,120 @@
-/**
- * Module that simplifies and extends the browser fetch method with a easier API and plugin architecture
- * @author JJ
- */
-
-// Throws an error and prevent module from being used if fetch is not available
-if (!window.fetch) throw new Error("FETCH API NOT AVAILABLE ON BROWSER");
-
 import deepmerge from "deepmerge";
+import isValidHttpMethod from "./isValidHttpMethod";
 
-import defaultErrorHandler from "./plugins/defaultErrorHandler";
+async function runErrorHandlers(error) {
+  console.error("error out!!", error);
+}
 
-/**
- * Suggestion: import package as "api" to avoid name collision with window.fetch
- */
-export default class fetch {
-  /**
-   * @param {object} configurations configurations object to configure the library
-   */
-  constructor(configurations = {}) {
-    // Destructure out all possible configuration values
-    // All array values have default empty arrays to prevent accessing properties of undefined errors
-    // @todo Remove to use null coalescing if using typescript or babel
-    const {
-      apiUrl,
-      apiUrls = [],
-      plugins = [],
-      errorHandler,
-      errorHandlers = [],
-    } = configurations;
+function createRequest(url = "", init, method, data) {
+  init.method = method;
+  init.body = data;
 
-    /*
-      Sequentially,
-        set apiURLs
-        then plugins
-        then errorHandlers
-    */
+  // Call window fetch with prepended API URL and default request object
 
-    // Combine all urls into a single array
-    this._apiUrls = apiUrl ? [apiUrl, ...apiUrls] : apiUrls;
+  // Can a plugin read values inside this Request object? Or can it directly modify this?
+  return { ...init, url };
+  // return new Request(url, init);
+}
 
-    // Set the module's internal base api URL
-    // Defaults to empty string to prevent concatenation with undefined as undefined will get converted to a string
-    // Order of precendence for the default base URL is apiUrl first then first apiUrl in the array of apiUrls
-    // @todo Change this multi assignment
-    this._apiUrl = this._default = this._apiUrls[0];
+// give them a method, where they can just add stuff to the Req object without merging themselves as plugin authors
 
+function f(req) {
+  console.log("typeof req.body ", typeof req.body);
+  if (typeof req.body === "object") req.body = JSON.stringify(req.body);
 
-    // All base API URLs if any, gets attached directly onto the object with "$" prepended to the key
-    // SOLVES THIS Might be dangerous as users can technically inject anything to pollute the "this" namespace
-    if (this._apiUrls.length)
-      deepmerge(
-        this,
-        apiUrls.reduce(function (acc, cur) {
-          acc[`$${cur.name}`] = cur.url;
-          return acc;
-        }, {})
-      );
+  return deepmerge(req, { url: "http://localhost:3000/ping" });
+}
 
-    // Defaults to array even though the destructure already contains the default value just to be extra safe
-    this._plugins = plugins || [];
+function f2(req) {
+  console.log("in plugin2", req);
+}
 
-    // These are either
-    this._errorHandlers = errorHandler
-      ? [errorHandler, ...errorHandlers]
-      : errorHandlers
-      ? errorHandlers
-      : defaultErrorHandler;
-  }
+// Default plugin is window.fetch, append and pop to the end.
+const plugins = [f, f2];
+const afterPlugins = [console.log];
 
-  /**
-   * Should only be called by _fetch
-   */
-  async _runPlugins(url, init) {
-    const request = {
-      url,
-      init,
-      headers: init.headers,
-      body: init.body,
-    };
+async function runPlugins(req) {
+  try {
+    // If plugin modify req, and the nxt is called, will it be the same object?
+    // If a plugin have an error, they should just throw, so that we call the runErrorHandlers
+    for (const plugin of plugins) req = (await plugin(req)) || req;
 
-    const response = {
-      body: response.body,
-      status: response.code, // ???
-    };
+    const url = req.url;
+    delete req.url;
+    const request = new Request(url, req);
 
-    const error = response.error;
+    console.log("bf call", request, request.body);
 
-    // Call the plugins
-    for (const plugin in this._plugins) {
-      // @todo How to set the return value of this as request or response?
-      await plugin(request, response, { merge: deepmerge, error });
-    }
-  }
+    const res = await window.fetch(request);
 
-  async _runErrorHandlers(error) {
-    // This might be slow if one handler takes a very long time
-    for (const handler in this._errorHandlers) await handler(error);
-  }
+    console.log("res", await res.json());
 
-  /**
-   * Inner fetch function used to prepend API base URL and parse the response
-   * @function _fetch
-   * @param {String} url path of the API only, the base API will be prepended
-   * @param {object} init Request object required by fetch
-   */
-  async _fetch(url = "", init) {
-    try {
-      // Set the return value to be init
-      await this._runPlugins(url, init);
+    // for (const plugin of afterPlugins) await plugin(res);
 
-      // Call window fetch with prepended API URL and default request object
-      const response = await window.fetch(this._apiUrl + url, init);
-
-      const parsedResponse = await getParsedResponse(response);
-
-      /* Return base on type of body data and include status code along side */
-      if (parsedResponse.json)
-        return { ...parsedResponse.response, statusCode: response.status };
-      else if (parsedResponse.string)
-        return { body: parsedResponse.response, statusCode: response.status };
-      else throw new Error("Invalid body type. Neither JSON nor String");
-    } catch (error) {
-      return this._runErrorHandlers(error);
-    }
-  }
-
-  /**
-   * GET curried function that takes a init object before an URL
-   */
-  _get(init = {}) {
-    // Arrow function to inherit "this", without using explicit "this" binding
-    return async (url) =>
-      this._fetch(
-        url,
-        deepmerge(
-          {
-            method: "GET",
-            headers: {
-              Authorization: await getAuthHeader(this._firebaseAuth),
-            },
-          },
-          init
-        )
-      );
-  }
-
-  /**
-   * POST curried function that takes a init object before an URL and data
-   */
-  _post(init = {}) {
-    // Arrow function to inherit "this", without using explicit "this" binding
-    return async (url, data) => {
-      if (data) init.body = JSON.stringify(data);
-
-      return this._fetch(
-        url,
-        deepmerge(
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": data ? "application/json" : undefined,
-              Authorization: await getAuthHeader(this._firebaseAuth),
-            },
-          },
-          init
-        )
-      );
-    };
-  }
-
-  /**
-   * PATCH curried function that takes a init object before an URL and data
-   */
-  _patch(init = {}) {
-    // Arrow function to inherit "this", without using explicit "this" binding
-    return async (url, data) => {
-      if (data) init.body = JSON.stringify(data);
-
-      return this._fetch(
-        url,
-        deepmerge(
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": data ? "application/json" : undefined,
-              Authorization: await getAuthHeader(this._firebaseAuth),
-            },
-          },
-          init
-        )
-      );
-    };
-  }
-
-  /**
-   * PUT curried function that takes a init object before an URL and data
-   */
-  _put(init = {}) {
-    // Arrow function to inherit "this", without using explicit "this" binding
-    return async (url, data) => {
-      if (data) init.body = JSON.stringify(data);
-
-      return this._fetch(
-        url,
-        deepmerge(
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": data ? "application/json" : undefined,
-              Authorization: await getAuthHeader(this._firebaseAuth),
-            },
-          },
-          init
-        )
-      );
-    };
-  }
-
-  /**
-   * DELETE curried function that takes a init object before an URL and data
-   * It is not recommended to include a request message body even though you are able to
-   */
-  _delete(init = {}) {
-    // Arrow function to inherit "this", without using explicit "this" binding
-    return async (url, data) => {
-      if (data) init.body = JSON.stringify(data);
-
-      return this._fetch(
-        url,
-        deepmerge(
-          {
-            method: "DELETE",
-            headers: {
-              "Content-Type": data ? "application/json" : undefined,
-              Authorization: await getAuthHeader(this._firebaseAuth),
-            },
-          },
-          init
-        )
-      );
-    };
-  }
-
-  /**
-   * Function to modify init object only once before making a new request
-   * @param {object} init Request object for fetch
-   * @returns {object} Same API object with custom request object partially applied.
-   *
-   * @example
-   * api.modify(custom request object).post(url, data)
-   */
-  modify(init) {
-    // Return the http methods to chain it and make a request
-    return {
-      get: this._get(init),
-      post: this._post(init),
-      patch: this._get(init),
-      put: this._post(init),
-      delete: this._post(init),
-    };
-  }
-
-  /**
-   * USE WITH CAUTION
-   * Function to modify init objects permanently for ALL methods
-   * @param {object} init Request object for fetch
-   * @returns {object} Same object with updated methods with new custom request object partially applied.
-   *
-   * @example
-   * api.modifyPermanently(custom request object).post(url, data)
-   */
-  modifyPermanently(init) {
-    this.get = this._get(init);
-    this.post = this._post(init);
-    this.patch = this._get(init);
-    this.put = this._post(init);
-    this.delete = this._post(init);
-
-    // Return object to allow caller to chain this method
-    return this;
+    // Return the response result as default behaviour
+    return res;
+  } catch (error) {
+    await runErrorHandlers(arguments[0]);
   }
 }
+
+// async because window.fetch returns a Promise, and we return it directly
+async function _fetch(url = "", init, method, data) {
+  const req = createRequest(url, init, method, data);
+
+  await runPlugins(req);
+}
+
+// const defaultInit = {};
+// how to set the obj values into defaultInit without modifying defaultInit
+// Using spread operator? Delete all keys then spread the new one in.
+
+// When modified, everywhere else that uses this lib will inherit this new default init
+// Bad code can just set this to an invalid none object, which will fail when we set things on it
+let defaultInit = {};
+
+const createFetch = (init, method) => async (url, data) =>
+  _fetch(url, init, method, data);
+
+const fetchObject = {
+  modifyDefaultInit(init = {}) {
+    defaultInit = init;
+  },
+
+  modify(init = {}) {
+    // Merge user provided init with default init, allowing user to override default options.
+    // Uses deepmerge to ensure for nested overrides, only that key is being overwritten
+    init = deepmerge(defaultInit, init);
+
+    // Return this to allow chaining
+    // Only Allowed to chain HTTP method calls to modify
+    // The returned is also a empty object wrapped by a proxy
+    return new Proxy(
+      {},
+      {
+        get(target, prop) {
+          console.log("Chained method called on modify: ", prop);
+
+          // Verify method is supported
+          if (isValidHttpMethod(prop)) return createFetch(init, prop);
+          else
+            throw new Error(
+              `Can only chain HTTP methods to 'modify', invalid HTTP Method: ${prop}`
+            );
+        },
+      }
+    );
+  },
+};
+
+const fetch = new Proxy(fetchObject, {
+  get(target, prop) {
+    console.log("Method called: ", prop);
+
+    // Check if prop passed in is a HTTP method or if they are trying to access something on the target object
+    if (isValidHttpMethod(prop)) return createFetch(defaultInit, prop);
+    else return target[prop];
+  },
+});
+
+export default fetch;
