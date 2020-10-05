@@ -1,43 +1,43 @@
 import deepmerge from "deepmerge";
 import isValidHttpMethod from "./isValidHttpMethod";
 
-async function runErrorHandlers(error) {
+async function runErrorHandlers(error: Error) {
   console.error("error out!!", error);
 }
 
-function createRequest(url = "", init, method, data) {
+function createRequest(url = "", init: any, method: string, data?: object) {
   init.method = method;
   init.body = data;
-
-  // Call window fetch with prepended API URL and default request object
-
-  // Can a plugin read values inside this Request object? Or can it directly modify this?
   return { ...init, url };
-  // return new Request(url, init);
 }
 
 // give them a method, where they can just add stuff to the Req object without merging themselves as plugin authors
 
-function f(req) {
+function f(req: any): object {
   console.log("typeof req.body ", typeof req.body);
   if (typeof req.body === "object") req.body = JSON.stringify(req.body);
 
   return deepmerge(req, { url: "http://localhost:3000/ping" });
 }
 
-function f2(req) {
+function f2(req: any): object | undefined {
   console.log("in plugin2", req);
+  return undefined;
 }
 
 // Default plugin is window.fetch, append and pop to the end.
 const plugins = [f, f2];
 const afterPlugins = [console.log];
 
-async function runPlugins(req) {
+async function runPlugins(req: any) {
   try {
     // If plugin modify req, and the nxt is called, will it be the same object?
     // If a plugin have an error, they should just throw, so that we call the runErrorHandlers
     for (const plugin of plugins) req = (await plugin(req)) || req;
+    // for (const plugin of plugins) {
+    //   const treq = await plugin(req);
+    //   if (treq) req = treq;
+    // }
 
     const url = req.url;
     delete req.url;
@@ -54,15 +54,16 @@ async function runPlugins(req) {
     // Return the response result as default behaviour
     return res;
   } catch (error) {
-    await runErrorHandlers(arguments[0]);
+    await runErrorHandlers(error);
   }
 }
 
 // async because window.fetch returns a Promise, and we return it directly
-async function _fetch(url = "", init, method, data) {
+async function _fetch(url = "", init: any, method: string, data?: object) {
   const req = createRequest(url, init, method, data);
 
-  await runPlugins(req);
+  // return await runPlugins(req);
+  return runPlugins(req);
 }
 
 // const defaultInit = {};
@@ -73,8 +74,10 @@ async function _fetch(url = "", init, method, data) {
 // Bad code can just set this to an invalid none object, which will fail when we set things on it
 let defaultInit = {};
 
-const createFetch = (init, method) => async (url, data) =>
-  _fetch(url, init, method, data);
+const createFetch = (init: any, method: string) => async (
+  url: string,
+  data?: object
+) => _fetch(url, init, method, data);
 
 const fetchObject = {
   modifyDefaultInit(init = {}) {
@@ -92,7 +95,7 @@ const fetchObject = {
     return new Proxy(
       {},
       {
-        get(target, prop) {
+        get(target, prop: string) {
           console.log("Chained method called on modify: ", prop);
 
           // Verify method is supported
@@ -105,10 +108,16 @@ const fetchObject = {
       }
     );
   },
+
+  // Func to get plugins
+  // func to set plugins
+  // func to remove plugin, either using func name of ID
+
+  // getPlugins()
 };
 
 const fetch = new Proxy(fetchObject, {
-  get(target, prop) {
+  get<T extends object, U extends string & keyof T>(target: T, prop: U) {
     console.log("Method called: ", prop);
 
     // Check if prop passed in is a HTTP method or if they are trying to access something on the target object
