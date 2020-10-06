@@ -1,5 +1,7 @@
 import deepmerge from "deepmerge";
-import isValidHttpMethod from "./isValidHttpMethod";
+import { runErrorHandlers } from "./runErrorHandlers";
+import { isValidHttpMethod } from "./utils/isValidHttpMethod";
+import { removePlugin } from "./utils/removePlugin";
 
 async function runErrorHandlers(error: Error) {
   console.error("error out!!", error);
@@ -20,24 +22,24 @@ function f(req: any): object {
   return deepmerge(req, { url: "http://localhost:3000/ping" });
 }
 
-function f2(req: any): object | undefined {
+function f2(req: any): object | void {
   console.log("in plugin2", req);
-  return undefined;
 }
 
 // Default plugin is window.fetch, append and pop to the end.
-const plugins = [f, f2];
-const afterPlugins = [console.log];
+const reqPlugins: Array<Function> = [f, f2];
+const resPlugins: Array<Function> = [
+  async (res: any): Promise<undefined> => (
+    console.log("res", await res.json()), res
+  ),
+  // async (res: any): Promise<void> => console.log("res", await res.json()),
+];
 
 async function runPlugins(req: any) {
   try {
-    // If plugin modify req, and the nxt is called, will it be the same object?
-    // If a plugin have an error, they should just throw, so that we call the runErrorHandlers
-    for (const plugin of plugins) req = (await plugin(req)) || req;
-    // for (const plugin of plugins) {
-    //   const treq = await plugin(req);
-    //   if (treq) req = treq;
-    // }
+    // If plugin modify req, overwrite original req and continue calling subsequent plugin with new req.
+    // If plugin errors out, they should throw and we will catch before calling runErrorHandlers with the error.
+    for (const plugin of reqPlugins) req = (await plugin(req)) || req;
 
     const url = req.url;
     delete req.url;
@@ -45,11 +47,9 @@ async function runPlugins(req: any) {
 
     console.log("bf call", request, request.body);
 
-    const res = await window.fetch(request);
+    let res = await window.fetch(request);
 
-    console.log("res", await res.json());
-
-    // for (const plugin of afterPlugins) await plugin(res);
+    for (const plugin of resPlugins) res = (await plugin(res)) || res;
 
     // Return the response result as default behaviour
     return res;
@@ -60,9 +60,12 @@ async function runPlugins(req: any) {
 
 // async because window.fetch returns a Promise, and we return it directly
 async function _fetch(url = "", init: any, method: string, data?: object) {
-  const req = createRequest(url, init, method, data);
+  // Create request object to be passed into reqPlugins and used later to generate the Request object for fetch call
+  init.method = method;
+  init.body = data;
+  const req = { ...init, url };
 
-  // return await runPlugins(req);
+  // Call without awaiting, for caller to await instead
   return runPlugins(req);
 }
 
@@ -79,7 +82,13 @@ const createFetch = (init: any, method: string) => async (
   data?: object
 ) => _fetch(url, init, method, data);
 
-const fetchObject = {
+interface looseObjectType {
+  [k: string]: any;
+}
+
+// Need this to even provide support for modify and modifyDefaultInit methods
+// const fetchObject = {
+const fetchObject: looseObjectType = {
   modifyDefaultInit(init = {}) {
     defaultInit = init;
   },
@@ -95,7 +104,8 @@ const fetchObject = {
     return new Proxy(
       {},
       {
-        get(target, prop: string) {
+        // @todo Is this the right way to define that target is unused?
+        get(_target, prop: string) {
           console.log("Chained method called on modify: ", prop);
 
           // Verify method is supported
@@ -109,15 +119,33 @@ const fetchObject = {
     );
   },
 
-  // Func to get plugins
-  // func to set plugins
-  // func to remove plugin, either using func name of ID
+  /* Func to get/set/remove plugins */
 
-  // getPlugins()
+  getReqPlugin(): string[] {
+    return reqPlugins.map((plugin) => plugin.name);
+  },
+  getResPlugin(): string[] {
+    return resPlugins.map((plugin) => plugin.name);
+  },
+
+  addReqPlugin(plugin: Function): void {
+    reqPlugins.push(plugin);
+  },
+  addResPlugin(plugin: Function): void {
+    resPlugins.push(plugin);
+  },
+
+  // Methods to remove plugin using plugins' function name
+  removeReqPlugin: removePlugin(resPlugins),
+  removeResPlugin: removePlugin(resPlugins),
 };
 
+for (const method of ["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+  fetchObject[method] = () => {};
+
 const fetch = new Proxy(fetchObject, {
-  get<T extends object, U extends string & keyof T>(target: T, prop: U) {
+  // get<T extends object, U extends string & keyof T>(target: T, prop: U)
+  get(target: looseObjectType, prop: string) {
     console.log("Method called: ", prop);
 
     // Check if prop passed in is a HTTP method or if they are trying to access something on the target object

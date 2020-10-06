@@ -13,6 +13,7 @@ module.exports = {
   mode: "production",
   target: "web",
   entry: "./src/index.ts",
+  // https://webpack.js.org/guides/author-libraries/#expose-the-library
   output: {
     path: path.resolve(__dirname, "./dist"),
     filename: "index.js",

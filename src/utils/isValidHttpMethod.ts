@@ -3,7 +3,7 @@
  * @todo Allow lib users to modify the list of supported methods
  * @param {String} methodNameToTest
  */
-export default (methodNameToTest: string) =>
+export const isValidHttpMethod = (methodNameToTest: string) =>
   ["GET", "POST", "PUT", "DELETE", "OPTIONS"].includes(
     methodNameToTest.toUpperCase()
   );

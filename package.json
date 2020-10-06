@@ -4,6 +4,7 @@
   "description": "Opinionated library to simplify browsers' 'fetch' API with a built in plugin architecture",
   "type": "module",
   "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "/dist"
   ],
