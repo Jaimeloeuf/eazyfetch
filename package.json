@@ -31,9 +31,6 @@
     "url": "https://github.com/Enkel-Digital/eazyfetch/issues"
   },
   "homepage": "https://github.com/Enkel-Digital/eazyfetch#readme",
-  "dependencies": {
-    "deepmerge": "^4.2.2"
-  },
   "devDependencies": {
     "babel-eslint": "^10.1.0",
     "eslint": "^7.10.0",
