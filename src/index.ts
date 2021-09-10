@@ -1,4 +1,4 @@
-import deepmerge from "deepmerge";
+import { merge } from "./utils/deepmerge";
 import { runErrorHandlers } from "./runErrorHandlers";
 import { isValidHttpMethod } from "./utils/isValidHttpMethod";
 import { removePlugin } from "./utils/removePlugin";
@@ -95,8 +95,8 @@ const fetchObject: looseObjectType = {
 
   modify(init = {}) {
     // Merge user provided init with default init, allowing user to override default options.
-    // Uses deepmerge to ensure for nested overrides, only that key is being overwritten
-    init = deepmerge(defaultInit, init);
+    // Uses deep merge to ensure for nested overrides, only that key is being overwritten
+    init = merge(defaultInit, init);
 
     // Return this to allow chaining
     // Only Allowed to chain HTTP method calls to modify
@@ -155,3 +155,4 @@ const fetch = new Proxy(fetchObject, {
 });
 
 export default fetch;
+export { merge };
