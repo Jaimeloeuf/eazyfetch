@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>easyfetch Demo</title>
+
+    <!-- <script src="../../dist/index.js" type="module"></script> -->
+    <script src="../../src-js/index.js" type="module"></script>
+    <!-- <script src="./index.js"></script> -->
+    <script>
+        async function test(e) {
+            e && e.preventDefault()
+
+            console.log(await ef.post("http://localhost:3000", { test: true }));
+            return;
+
+            // console.log(await ef.get("https://jsonplaceholder.typicode.com/posts/1"));
+            // console.log(await ef.post("https://jsonplaceholder.typicode.com/posts", {
+            //     userId: 1,
+            //     title: 'foo',
+            //     body: 'bar',
+            // }));
+            // console.log(await ef.put("https://jsonplaceholder.typicode.com/posts/1", {
+            //     test: "true",
+            //     value: "set"
+            // }));
+            // console.log(ef.modify);
+        }
+
+        window.onload = function () {
+            console.log(window.easyfetch);
+            // window.ef = new window.easyfetch.default();
+
+            // console.log(new easyfetch.default());
+            // window.ef = new window.easyfetch.default();
+            // console.log(window.ef);
+
+            window.ef = window.easyfetch.default
+            // window.ef = easyfetch
+            // These are the default methods on the object that are not HTTP methods
+            console.log(window.ef);
+
+            window.document.getElementById("btn").onclick = test;
+
+            test()
+        };
+    </script>
+</head>
+
+<body>
+    <button id="btn">Get data</button>
+</body>
+
+</html>
