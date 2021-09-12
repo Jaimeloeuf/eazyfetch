@@ -75,7 +75,10 @@ async function _fetch(url = "", init: any, method: string, data?: object) {
 
 // When modified, everywhere else that uses this lib will inherit this new default init
 // Bad code can just set this to an invalid none object, which will fail when we set things on it
-let defaultInit = {};
+// type {} because we should allow it to be overwritten by modifyDefaultInit
+let defaultInit: {} = {
+  headers: {},
+};
 
 const createFetch = (init: any, method: string) => async (
   url: string,
@@ -142,6 +145,10 @@ const fetchObject: looseObjectType = {
 
 for (const method of ["GET", "POST", "PUT", "DELETE", "OPTIONS"])
   fetchObject[method] = () => {};
+
+["GET", "POST", "PUT", "DELETE", "OPTIONS"].forEach(
+  (method: string) => (fetchObject[method] = () => {})
+);
 
 const fetch = new Proxy(fetchObject, {
   // get<T extends object, U extends string & keyof T>(target: T, prop: U)

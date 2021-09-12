@@ -15,6 +15,7 @@
     "build": "npm run lint && git stash --include-untracked && npx rimraf ./dist && npx webpack --config webpack.config.cjs && git stash apply",
     "build:develop": "npx rimraf ./dist && npx webpack --config webpack.config.cjs",
     "build:watch": "npx nodemon -x \"npm run build:develop\" -w \"./src\"",
+    "dev": "npx webpack --watch",
     "publish:npm": "npm run build && npm publish"
   },
   "repository": {
