@@ -3,37 +3,15 @@ import { runErrorHandlers } from "./runErrorHandlers";
 import { isValidHttpMethod } from "./utils/isValidHttpMethod";
 import { removePlugin } from "./utils/removePlugin";
 
-async function runErrorHandlers(error: Error) {
-  console.error("error out!!", error);
-}
-
-function createRequest(url = "", init: any, method: string, data?: object) {
-  init.method = method;
-  init.body = data;
-  return { ...init, url };
-}
-
-// give them a method, where they can just add stuff to the Req object without merging themselves as plugin authors
-
-function f(req: any): object {
-  console.log("typeof req.body ", typeof req.body);
-  if (typeof req.body === "object") req.body = JSON.stringify(req.body);
-
-  return deepmerge(req, { url: "http://localhost:3000/ping" });
-}
-
-function f2(req: any): object | void {
-  console.log("in plugin2", req);
-}
+import { insertHeaders } from "./plugins/insertHeaders";
+import { stringifyBody } from "./plugins/stringifyBody";
+import { getParsedResponse } from "./plugins/getParsedResponse";
 
 // Default plugin is window.fetch, append and pop to the end.
-const reqPlugins: Array<Function> = [f, f2];
-const resPlugins: Array<Function> = [
-  async (res: any): Promise<undefined> => (
-    console.log("res", await res.json()), res
-  ),
-  // async (res: any): Promise<void> => console.log("res", await res.json()),
-];
+// const reqPlugins: Array<Function> = [insertHeaders, stringifyBody];
+// const resPlugins: Array<Function> = [getParsedResponse, console.log];
+const reqPlugins: Array<Function> = [];
+const resPlugins: Array<Function> = [];
 
 async function runPlugins(req: any) {
   try {
