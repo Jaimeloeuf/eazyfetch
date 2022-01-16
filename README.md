@@ -1,3 +1,11 @@
+# DEPRECATED
+`eazyfetch` library is fully deprecated. No new changes are expected to land. This library is still not complete and will probably never be completed.  
+This is deprecated because [simpler-fetch](https://github.com/Enkel-Digital/simpler-fetch/) turned out to be a much better alternative and can do most of what this library intends to achieve too, which is to make browser's `fetch` API easier to work with.  
+
+The main difference is that simpler-fetch is a much more low level library, without support for plugins at least at the time of writing this. So there are some changes in how you structure your API calls, but for most basic tasks, it is more than enough to fully replace this.
+
+See this [`simpler-fetch` documentation](https://github.com/Enkel-Digital/simpler-fetch#readme) to migrate, and here is [documentation on using firebase auth](https://github.com/Enkel-Digital/simpler-fetch/blob/master/firebase-auth.md) with `simpler-fetch`.
+
 # eazyfetch
 Opinionated library that extends the browsers' fetch API to simplify its API and to provide a simple to use plugin architecture to allow for more advanced features to be easily built on top of the fetch API.
 
