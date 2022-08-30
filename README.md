@@ -4,7 +4,7 @@ This is deprecated because [simpler-fetch](https://github.com/Enkel-Digital/simp
 
 The main difference is that simpler-fetch is a much more low level library, without support for plugins at least at the time of writing this. So there are some changes in how you structure your API calls, but for most basic tasks, it is more than enough to fully replace this.
 
-See this [`simpler-fetch` documentation](https://github.com/Enkel-Digital/simpler-fetch#readme) to migrate, and here is [documentation on using firebase auth](https://github.com/Enkel-Digital/simpler-fetch/blob/master/firebase-auth.md) with `simpler-fetch`.
+See this [`simpler-fetch` documentation](https://github.com/Enkel-Digital/simpler-fetch#readme) to migrate, and here is [documentation on using firebase auth](https://github.com/Enkel-Digital/simpler-fetch/blob/master/docs/firebase-auth.md) with `simpler-fetch`.
 
 # eazyfetch
 Opinionated library that extends the browsers' fetch API to simplify its API and to provide a simple to use plugin architecture to allow for more advanced features to be easily built on top of the fetch API.
